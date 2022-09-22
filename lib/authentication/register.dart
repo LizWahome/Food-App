@@ -1,8 +1,11 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/src/widgets/container.dart';
 import 'package:flutter/src/widgets/framework.dart';
+import 'package:foodpanda/mainScreens/home_screen.dart';
 import 'package:foodpanda/widgets/custom_text_field.dart';
 import 'package:foodpanda/widgets/error_dialog.dart';
 import 'package:foodpanda/widgets/loading_dialog.dart';
@@ -11,6 +14,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fStorage;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SignUp extends StatefulWidget {
   const SignUp({super.key});
@@ -34,6 +38,7 @@ class _SignUpState extends State<SignUp> {
   List<Placemark>? placeMarks;
 
   String sellerImageUrl = '';
+  String completeAddress = '';
 
   set location(String location) {}
 
@@ -89,7 +94,7 @@ class _SignUpState extends State<SignUp> {
         await placemarkFromCoordinates(position.latitude, position.longitude);
 
     Placemark pMark = placeMarks![0];
-    String completeAddress =
+    completeAddress =
         '${pMark.subThoroughfare}, ${pMark.thoroughfare}, ${pMark.subLocality}, ${pMark.locality}, ${pMark.subAdministrativeArea}, ${pMark.administrativeArea}, ${pMark.postalCode}, ${pMark.country}';
     locationController.text = completeAddress;
   }
@@ -132,6 +137,8 @@ class _SignUpState extends State<SignUp> {
               await uploadTask.whenComplete(() {});
           await taskSnapshot.ref.getDownloadURL().then((url) {
             sellerImageUrl = url;
+            //save info to firestore
+            authenticateSellerAndSignUp();
           });
         } else {
           showDialog(
@@ -152,6 +159,61 @@ class _SignUpState extends State<SignUp> {
             });
       }
     }
+  }
+
+  void authenticateSellerAndSignUp() async {
+    User? currentUser;
+    final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
+
+    await firebaseAuth
+        .createUserWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim())
+        .then((auth) {
+      currentUser = auth.user;
+    }).catchError((error) {
+      Navigator.pop(context);
+      showDialog(
+          context: context,
+          builder: (context) {
+            return ErrorDialog(
+              message: error.message.toString(),
+            );
+          });
+    });
+
+    if (currentUser != null) {
+      saveDataToFirestore(currentUser!).then((value) {
+        Navigator.pop(context);
+        //send user to homepage
+        Route newRoute = MaterialPageRoute(builder: (context) => HomeScreen());
+        Navigator.push(context, newRoute);
+      });
+    }
+  }
+
+  //save data to Firestore
+  Future saveDataToFirestore(User currentUser) async {
+    FirebaseFirestore.instance.collection("sellers").doc(currentUser.uid).set({
+      "sellerUID": currentUser.uid,
+      "sellerEmail": currentUser.email,
+      "sellerName": nameController.text.trim(),
+      "sellerAvatarUrl": sellerImageUrl,
+      "phone": phoneController.text.trim(),
+      "address": completeAddress,
+      "status": "approved",
+      "earnings": 0.0,
+      "lat": position!.latitude,
+      "lng": position!.longitude,
+    });
+
+    //save data locally
+    SharedPreferences? sharedPreferences =
+        await SharedPreferences.getInstance();
+    await sharedPreferences.setString("uid", currentUser.uid);
+    await sharedPreferences.setString("email", emailController.text.trim());
+    await sharedPreferences.setString("name", nameController.text.trim());
+    await sharedPreferences.setString("photoUrl", sellerImageUrl);
   }
 
   @override
