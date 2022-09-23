@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/src/widgets/container.dart';
 import 'package:flutter/src/widgets/framework.dart';
+import 'package:foodpanda/global/global.dart';
 import 'package:foodpanda/mainScreens/home_screen.dart';
 import 'package:foodpanda/widgets/custom_text_field.dart';
 import 'package:foodpanda/widgets/error_dialog.dart';
@@ -49,6 +50,7 @@ class _SignUpState extends State<SignUp> {
     });
   }
 
+
   Future<Position> _getGeoLocationPosition() async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -88,8 +90,10 @@ class _SignUpState extends State<SignUp> {
       desiredAccuracy: LocationAccuracy.high,
     );
 
-    position = newPosition;
+    setState(() {
+      position = newPosition;
 
+    });
     placeMarks =
         await placemarkFromCoordinates(position.latitude, position.longitude);
 
@@ -161,11 +165,10 @@ class _SignUpState extends State<SignUp> {
     }
   }
 
-  void authenticateSellerAndSignUp() async {
+  Future<void> authenticateSellerAndSignUp() async {
     User? currentUser;
-    final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
 
-    await firebaseAuth
+    await firebaseAuth!
         .createUserWithEmailAndPassword(
             email: emailController.text.trim(),
             password: passwordController.text.trim())
@@ -203,17 +206,16 @@ class _SignUpState extends State<SignUp> {
       "address": completeAddress,
       "status": "approved",
       "earnings": 0.0,
-      "lat": position!.latitude,
-      "lng": position!.longitude,
+      "lat": position?.latitude ??'',
+      "lng": position?.longitude ?? '',
     });
 
     //save data locally
-    SharedPreferences? sharedPreferences =
-        await SharedPreferences.getInstance();
-    await sharedPreferences.setString("uid", currentUser.uid);
-    await sharedPreferences.setString("email", emailController.text.trim());
-    await sharedPreferences.setString("name", nameController.text.trim());
-    await sharedPreferences.setString("photoUrl", sellerImageUrl);
+    sharedPreferences = await SharedPreferences.getInstance();
+    await sharedPreferences!.setString("uid", currentUser.uid);
+    await sharedPreferences!.setString("email", emailController.text.trim());
+    await sharedPreferences!.setString("name", nameController.text.trim());
+    await sharedPreferences!.setString("photoUrl", sellerImageUrl);
   }
 
   @override
