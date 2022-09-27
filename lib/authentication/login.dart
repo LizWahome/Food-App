@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/src/widgets/container.dart';
 import 'package:flutter/src/widgets/framework.dart';
+import 'package:foodpanda/authentication/auth_screen.dart';
 import 'package:foodpanda/global/global.dart';
 import 'package:foodpanda/mainScreens/home_screen.dart';
 import 'package:foodpanda/widgets/error_dialog.dart';
@@ -68,11 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (currentUser != null) {
       log('proceeding to read data and set data to locally');
-      await readDataAndSetDataLocally(currentUser!).then((value) {
-        Navigator.pop(context);
-        Navigator.push(context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()));
-      });
+      readDataAndSetDataLocally(currentUser!);
     }
   }
 
@@ -83,19 +80,39 @@ class _LoginScreenState extends State<LoginScreen> {
         .doc(currentUser.uid)
         .get();
     log('OUR DATA: $data');
-    // await FirebaseFirestore.instance
-    //     .collection("sellers")
-    //     .doc(currentUser.uid)
-    //     .get()
-    //     .then((snapshot) async {
-    //   await sharedPreferences!.setString("uid", snapshot.data()!["sellerUid"]);
-    //   await sharedPreferences!
-    //       .setString("name", snapshot.data()!["sellerName"]);
-    //   await sharedPreferences!
-    //       .setString("email", snapshot.data()!["sellerEmail"]);
-    //   await sharedPreferences!
-    //       .setString("photoUrl", snapshot.data()!["sellerAvatarUrl"]);
-    // });
+    await FirebaseFirestore.instance
+        .collection("sellers")
+        .doc(currentUser.uid)
+        .get()
+        .then((snapshot) async {
+      if (snapshot.exists) {
+        await sharedPreferences!
+            .setString("uid", snapshot.data()!["sellerUID"]);
+        await sharedPreferences!
+            .setString("name", snapshot.data()!["sellerName"]);
+        await sharedPreferences!
+            .setString("email", snapshot.data()!["sellerEmail"]);
+        await sharedPreferences!
+            .setString("photoUrl", snapshot.data()!["sellerAvatarUrl"]);
+
+        Navigator.pop(context);
+        Navigator.push(context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()));
+      } else {
+        firebaseAuth!.signOut();
+        Navigator.pop(context);
+        Navigator.push(context,
+            MaterialPageRoute(builder: (context) => const AuthScreen()));
+
+            showDialog(
+          context: context,
+          builder: (context) {
+            return const ErrorDialog(
+              message: "No record found, Try Signing In",
+            );
+          });
+      }
+    });
   }
 
   @override
